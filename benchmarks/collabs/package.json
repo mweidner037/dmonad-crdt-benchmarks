@@ -13,6 +13,6 @@
   "author": "Matthew Weidner",
   "license": "MIT",
   "dependencies": {
-    "@collabs/collabs": "0.11.0"
+    "@collabs/collabs": "0.11.1"
   }
 }

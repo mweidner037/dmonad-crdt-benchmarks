@@ -1,4 +1,4 @@
-import { CRuntime, CText, CValueList, CValueMap } from "@collabs/collabs";
+import { CRichText, CRuntime, CValueList, CValueMap } from "@collabs/collabs";
 import { AbstractCrdt, CrdtFactory } from "../../js-lib/index.js"; // eslint-disable-line
 
 export const name = "collabs";
@@ -41,7 +41,12 @@ export class CollabsCRDT {
       "map",
       (init) => new CValueMap(init)
     );
-    this.text = this.runtime.registerCollab("text", (init) => new CText(init));
+    // Y.Text is really a rich-text CRDT. For fairness, use our CRichText,
+    // even though CText can support all of the ops here.
+    this.text = this.runtime.registerCollab(
+      "text",
+      (init) => new CRichText(init)
+    );
   }
 
   /**
@@ -124,7 +129,7 @@ export class CollabsCRDT {
    * @param {string} text
    */
   insertText(index, text) {
-    this.runtime.transact(() => this.text.insert(index, text));
+    this.runtime.transact(() => this.text.insert(index, text, {}));
   }
 
   /**
