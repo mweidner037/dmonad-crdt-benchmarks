@@ -50,7 +50,7 @@ export const runBenchmarkB4 = async (crdtFactory, filter) => {
       for (let i = 0; i < inputData.length; i++) {
         changeFunction(doc1, inputData[i], i);
       }
-      // Parse how long it takes to receive the updates.
+      // Measure how long it takes to receive the updates.
       const doc2 = crdtFactory.create(update => updates.push(update))
       benchmarkTime(crdtFactory.getName(), `${id} (receiveTime)`, () => {
         for (let i = 0; i < inputData.length; i++) {
@@ -58,6 +58,9 @@ export const runBenchmarkB4 = async (crdtFactory, filter) => {
         }
       })
       check(doc2)
+      // Measure total size of updates (network usage).
+      const updateSize = updates.map(update => update.length).reduce((a, b) => a + b, 0);
+      setBenchmarkResult(crdtFactory.getName(), `${id} (updateSize)`, `${updateSize} bytes`)
     })()
   }
 

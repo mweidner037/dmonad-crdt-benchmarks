@@ -489,6 +489,10 @@
       "yjs": "7670 ms",
       "collabs": "1951 ms"
     },
+    "[B4] Apply real-world editing dataset (updateSize)": {
+      "yjs": "15131808 bytes",
+      "collabs": "13425109 bytes"
+    },
     "[B4x100] Apply real-world editing dataset 100 times (time)": {
       "yjs": "189737 ms",
       "collabs": "2325143 ms"

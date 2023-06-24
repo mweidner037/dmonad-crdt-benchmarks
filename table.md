@@ -127,6 +127,7 @@ N = 6000 | yjs | ywasm | automerge-wasm | collabs|
 |[B4] Apply real-world editing dataset (parseTime)                         |           63 ms |         skipped |         skipped |           61 ms |
 |[B4] Apply real-world editing dataset (memUsed)                           |          2.9 MB |         skipped |         skipped |          2.2 MB |
 |[B4] Apply real-world editing dataset (receiveTime)                       |         7670 ms |         skipped |         skipped |         1951 ms |
+|[B4] Apply real-world editing dataset (updateSize)                        |  15131808 bytes |         skipped |         skipped |  13425109 bytes |
 |[B4x100] Apply real-world editing dataset 100 times (time)                |       189737 ms |         skipped |         skipped |      2325143 ms |
 |[B4x100] Apply real-world editing dataset 100 times (encodeTime)          |         1008 ms |         skipped |         skipped |         1666 ms |
 |[B4x100] Apply real-world editing dataset 100 times (docSize)             |  15989245 bytes |         skipped |         skipped |  16255106 bytes |
