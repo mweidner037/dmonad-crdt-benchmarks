@@ -95,7 +95,9 @@ export class CollabsCRDT {
    * @param {Array<any>} elems
    */
   insertArray(index, elems) {
-    this.array.insert(index, ...elems);
+    // We wrap each op in a transaction so it sends its
+    // message synchronously (skips default batching).
+    this.runtime.transact(() => this.array.insert(index, ...elems));
   }
 
   /**
@@ -105,7 +107,7 @@ export class CollabsCRDT {
    * @param {number} len
    */
   deleteArray(index, len) {
-    this.array.delete(index, len);
+    this.runtime.transact(() => this.array.delete(index, len));
   }
 
   /**
@@ -122,7 +124,7 @@ export class CollabsCRDT {
    * @param {string} text
    */
   insertText(index, text) {
-    this.text.insert(index, text);
+    this.runtime.transact(() => this.text.insert(index, text));
   }
 
   /**
@@ -132,7 +134,7 @@ export class CollabsCRDT {
    * @param {number} len
    */
   deleteText(index, len) {
-    this.text.delete(index, len);
+    this.runtime.transact(() => this.text.delete(index, len));
   }
 
   /**
@@ -146,7 +148,10 @@ export class CollabsCRDT {
    * @param {function (AbstractCrdt): void} f
    */
   transact(f) {
-    this.runtime.transact(() => f(this));
+    // B3 benchmarks wrap applyUpdate in a transact call, which Collabs
+    // doesn't expect ("Cannot call receive() during a transaction").
+    // So ignore the benchmarks' transact calls.
+    f(this);
   }
 
   /**
@@ -154,7 +159,7 @@ export class CollabsCRDT {
    * @param {any} val
    */
   setMap(key, val) {
-    this.map.set(key, val);
+    this.runtime.transact(() => this.map.set(key, val));
   }
 
   /**
