@@ -1,7 +1,6 @@
-import { setBenchmarkResult, benchmarkTime, logMemoryUsed, getMemUsed, tryGc, runBenchmark } from './utils.js'
-import * as math from 'lib0/math'
 import * as t from 'lib0/testing'
-import { CrdtFactory, AbstractCrdt } from './index.js' // eslint-disable-line
+import { AbstractCrdt, CrdtFactory } from './index.js'; // eslint-disable-line
+import { benchmarkTime, getMemUsed, logMemoryUsed, runBenchmark, setBenchmarkResult, tryGc } from './utils.js'
 // @ts-ignore
 import { edits, finalText } from './b4-editing-trace.js'
 
@@ -44,6 +43,21 @@ export const runBenchmarkB4 = async (crdtFactory, filter) => {
         doc.applyUpdate(encodedState)
       })
       logMemoryUsed(crdtFactory.getName(), id, startHeapUsed)
+    })()
+    ;(() => {
+      const updates = [];
+      const doc1 = crdtFactory.create(update => updates.push(update))
+      for (let i = 0; i < inputData.length; i++) {
+        changeFunction(doc1, inputData[i], i);
+      }
+      // Parse how long it takes to receive the updates.
+      const doc2 = crdtFactory.create(update => updates.push(update))
+      benchmarkTime(crdtFactory.getName(), `${id} (receiveTime)`, () => {
+        for (let i = 0; i < inputData.length; i++) {
+          doc2.applyUpdate(updates[i]);
+        }
+      })
+      check(doc2)
     })()
   }
 
