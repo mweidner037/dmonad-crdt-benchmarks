@@ -2,6 +2,7 @@
 import { AbstractCrdt, CrdtFactory } from '../../js-lib/index.js'; // eslint-disable-line
 import * as error from 'lib0/error';
 import { ListCRDT, TextCRDT } from './bundle.js';
+import pako from "pako";
 
 export const name = 'list-positions'
 
@@ -10,7 +11,7 @@ export const name = 'list-positions'
  */
 export class ListPositionsFactory {
   /**
-   * @param {function(Uint8Array):void} updateHandler
+   * @param {function(Uint8Array|string):void} updateHandler
    */
   create (updateHandler) {
     return new ListPositionsCRDT(updateHandler)
@@ -22,6 +23,7 @@ export class ListPositionsFactory {
    * @return {AbstractCrdt}
    */
   load (updateHandler, bin) {
+    // @ts-ignore I believe string messages will work fine.
     const crdt = new ListPositionsCRDT(updateHandler)
     crdt.load(bin)
     return crdt
@@ -37,18 +39,22 @@ export class ListPositionsFactory {
  */
 export class ListPositionsCRDT {
   /**
-   * @param {function(Uint8Array):void} updateHandler
+   * @param {function(Uint8Array|string):void} updateHandler
    */
   constructor (updateHandler) {
+    /** @type {TextCRDT} */
     this.textCrdt = new TextCRDT(msg => {
-      // Prepend with path to the CRDT.
-      msg = "text " + msg;
-      updateHandler(Buffer.from(msg))
+      // @ts-ignore Modify message object.
+      msg.path = "text";
+      // Use simple JSON encoding.
+      updateHandler(JSON.stringify(msg))
     })
+    /** @type {ListCRDT<unknown>} */
     this.arrayCrdt = new ListCRDT(msg => {
-      // Prepend with path to the CRDT.
-      msg = "array " + msg;
-      updateHandler(Buffer.from(msg))
+      // @ts-ignore Modify message object.
+      msg.path = "array";
+      // Use simple JSON encoding.
+      updateHandler(JSON.stringify(msg))
     })
   }
 
@@ -56,21 +62,37 @@ export class ListPositionsCRDT {
    * @return {Uint8Array|string}
    */
   getEncodedState () {
-    return Y.encodeStateAsUpdateV2(this.ydoc)
-  }
-
-  /**
-   * @param {Uint8Array} update
-   */
-  applyUpdate (update) {
-    Y.applyUpdateV2(this.ydoc, update)
+    const savedState = {
+      text: this.textCrdt.save(),
+      array: this.arrayCrdt.save()
+    }
+    // Use gzip'd JSON encoding. This trades off load/save time for size.
+    // A custom binary encoding would probably give a better tradeoff.
+    return pako.gzip(JSON.stringify(savedState));
   }
 
   /**
    * @param {Uint8Array} savedState
    */
   load(savedState) {
-    // TODO
+    const savedStateObj = JSON.parse(pako.ungzip(savedState, { to: "string" }));
+    this.textCrdt.load(savedStateObj.text);
+    this.arrayCrdt.load(savedStateObj.array);
+  }
+
+  /**
+   * @param {string} update
+   */
+  applyUpdate (update) {
+    const message = JSON.parse(update);
+    switch (message.path) {
+      case "text":
+        this.textCrdt.receive(message);
+        break;
+      case "array":
+        this.arrayCrdt.receive(message);
+        break;
+    }
   }
 
   /**
@@ -80,7 +102,7 @@ export class ListPositionsCRDT {
    * @param {Array<any>} elems
    */
   insertArray (index, elems) {
-    this.yarray.insert(index, elems)
+    this.arrayCrdt.insertAt(index, elems)
   }
 
   /**
@@ -90,14 +112,14 @@ export class ListPositionsCRDT {
    * @param {number} len
    */
   deleteArray (index, len) {
-    this.yarray.delete(index, len)
+    this.arrayCrdt.deleteAt(index, len)
   }
 
   /**
    * @return {Array<any>}
    */
   getArray () {
-    return this.yarray.toArray()
+    return this.arrayCrdt.list.slice();
   }
 
   /**
@@ -107,7 +129,7 @@ export class ListPositionsCRDT {
    * @param {string} text
    */
   insertText (index, text) {
-    this.ytext.insert(index, text)
+    this.textCrdt.insertAt(index, text)
   }
 
   /**
@@ -117,14 +139,14 @@ export class ListPositionsCRDT {
    * @param {number} len
    */
   deleteText (index, len) {
-    this.ytext.delete(index, len)
+    this.textCrdt.deleteAt(index, len)
   }
 
   /**
    * @return {string}
    */
   getText () {
-    return this.ytext.toString()
+    return this.textCrdt.text.toString()
   }
 
   /**

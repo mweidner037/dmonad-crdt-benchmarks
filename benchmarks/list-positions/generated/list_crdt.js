@@ -1,7 +1,7 @@
 import { List, Outline, PositionSet, } from "list-positions";
 /**
  * A traditional op-based/state-based list CRDT implemented on top of list-positions.
- * Copied from https://github.com/mweidner037/list-positions/blob/master/benchmarks/internal/list_crdt.ts
+ * Based on https://github.com/mweidner037/list-positions/blob/master/benchmarks/internal/list_crdt.ts
  *
  * send/receive work on general networks (they build in exactly-once partial-order delivery),
  * and save/load work as state-based merging.
