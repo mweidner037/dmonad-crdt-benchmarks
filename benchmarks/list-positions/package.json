@@ -14,7 +14,6 @@
     "generate": "tsc",
     "dist": "npm run clean && npm run generate && rollup -c && gzip --keep dist/*"
   },
-  "author": "Kevin Jahns",
   "license": "MIT",
   "dependencies": {
     "list-positions": "^1.0.0",
