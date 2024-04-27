@@ -62,6 +62,7 @@ export class ListCRDT<T> {
 
   insertAt(index: number, value: T): void {
     const [pos, newMeta] = this.list.insertAt(index, value);
+    this.seen.add(pos);
     const message: ListCrdtMessage<T> = { type: "set", pos, value };
     if (newMeta !== null) message.meta = newMeta;
     this.send(message);
@@ -131,8 +132,9 @@ export class ListCRDT<T> {
 
         if (message.meta) {
           // The meta may have unblocked pending messages.
-          const unblocked = this.pending.get(message.meta.parentID);
+          const unblocked = this.pending.get(message.meta.bunchID);
           if (unblocked !== undefined) {
+            this.pending.delete(message.meta.bunchID);
             // TODO: if you unblock a long dependency chain (unlikely),
             // this recursion could overflow the stack.
             for (const msg2 of unblocked) this.receive(msg2);
@@ -177,8 +179,7 @@ export class ListCRDT<T> {
 
       // Loop over all positions that had been inserted or deleted into
       // the other list.
-      // We don't have to manage metadata because a saved state always includes
-      // all of its dependent metadata.
+      this.list.order.load(savedState.order);
       for (const pos of otherSeen) {
         if (!this.seen.has(pos)) {
           // pos is new to us. Copy its state from the other list.
