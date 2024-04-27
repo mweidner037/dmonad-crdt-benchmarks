@@ -11,11 +11,15 @@
     "start:bun": "npm run measure-bundle && bun run run.js && npm run table",
     "start:browser": "rollup -c && 0serve -o benchmark.html",
     "table": "echo 'List-positions results: \n\n' && node ../../bin/render-table.js ../results.json 6000 list-positions",
-    "dist": "npm run clean && rollup -c && gzip --keep dist/*"
+    "generate": "tsc",
+    "dist": "npm run clean && npm run generate && rollup -c && gzip --keep dist/*"
   },
   "author": "Kevin Jahns",
   "license": "MIT",
   "dependencies": {
     "list-positions": "^1.0.0"
+  },
+  "devDependencies": {
+    "typescript": "^5.4.5"
   }
 }
