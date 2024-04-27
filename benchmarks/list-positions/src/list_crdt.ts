@@ -9,7 +9,7 @@ import {
   PositionSet,
 } from "list-positions";
 
-type Message<T> =
+export type ListCrdtMessage<T> =
   | {
       type: "set";
       pos: Position;
@@ -18,7 +18,7 @@ type Message<T> =
     }
   | { type: "delete"; pos: Position };
 
-type SavedState<T> = {
+export type ListCrdtSavedState<T> = {
   order: OrderSavedState;
   list: ListSavedState<T>;
   seen: OutlineSavedState;
@@ -26,6 +26,7 @@ type SavedState<T> = {
 
 /**
  * A traditional op-based/state-based list CRDT implemented on top of list-positions.
+ * Based on https://github.com/mweidner037/list-positions/blob/master/benchmarks/internal/list_crdt.ts
  *
  * send/receive work on general networks (they build in exactly-once partial-order delivery),
  * and save/load work as state-based merging.
@@ -51,9 +52,9 @@ export class ListCRDT<T> {
    * Maps from bunchID to a Set of messages that are waiting on that
    * bunch's BunchMeta before they can be processed.
    */
-  private readonly pending: Map<string, Set<string>>;
+  private readonly pending: Map<string, Set<ListCrdtMessage<T>>>;
 
-  constructor(private readonly send: (msg: string) => void) {
+  constructor(private readonly send: (message: ListCrdtMessage<T>) => void) {
     this.list = new List();
     this.seen = new PositionSet();
     this.pending = new Map();
@@ -61,77 +62,76 @@ export class ListCRDT<T> {
 
   insertAt(index: number, value: T): void {
     const [pos, newMeta] = this.list.insertAt(index, value);
-    const messageObj: Message<T> = { type: "set", pos, value };
-    if (newMeta !== null) messageObj.meta = newMeta;
-    this.send(JSON.stringify(messageObj));
+    const message: ListCrdtMessage<T> = { type: "set", pos, value };
+    if (newMeta !== null) message.meta = newMeta;
+    this.send(message);
   }
 
   deleteAt(index: number): void {
     const pos = this.list.positionAt(index);
     this.list.delete(pos);
-    const messageObj: Message<T> = { type: "delete", pos };
-    this.send(JSON.stringify(messageObj));
+    const message: ListCrdtMessage<T> = { type: "delete", pos };
+    this.send(message);
   }
 
-  receive(msg: string): void {
+  receive(message: ListCrdtMessage<T>): void {
     // TODO: test dedupe & partial ordering.
-    const decoded = JSON.parse(msg) as Message<T>;
-    const bunchID = decoded.pos.bunchID;
+    const bunchID = message.pos.bunchID;
 
-    switch (decoded.type) {
+    switch (message.type) {
       case "delete":
         // Mark the position as seen immediately, even if we don't have metadata
         // for its bunch yet. Okay because this.seen is a PositionSet instead of an Outline.
-        this.seen.add(decoded.pos);
+        this.seen.add(message.pos);
         // Delete the position if present.
         // If the bunch is unknown, it's definitely not present, and we
         // should skip calling list.has to avoid a "Missing metadata" error.
         if (
           this.list.order.getNode(bunchID) !== undefined &&
-          this.list.has(decoded.pos)
+          this.list.has(message.pos)
         ) {
           // For a hypothetical event, compute the index.
-          void this.list.indexOfPosition(decoded.pos);
+          void this.list.indexOfPosition(message.pos);
 
-          this.list.delete(decoded.pos);
+          this.list.delete(message.pos);
         }
         break;
       case "set":
         // This check is okay even if we don't have metadata for pos's bunch yet,
         // because this.seen is a PositionSet instead of an Outline.
-        if (this.seen.has(decoded.pos)) {
+        if (this.seen.has(message.pos)) {
           // The position has already been seen (inserted, inserted & deleted, or
           // deleted by an out-of-order message). So don't need to insert it again.
           return;
         }
 
-        if (decoded.meta) {
-          const parentID = decoded.meta.parentID;
+        if (message.meta) {
+          const parentID = message.meta.parentID;
           if (this.list.order.getNode(parentID) === undefined) {
             // The meta can't be processed yet because its parent bunch is unknown.
             // Add it to pending.
-            this.addToPending(parentID, msg);
+            this.addToPending(parentID, message);
             return;
-          } else this.list.order.addMetas([decoded.meta]);
+          } else this.list.order.addMetas([message.meta]);
 
           if (this.list.order.getNode(bunchID) === undefined) {
             // The message can't be processed yet because its bunch is unknown.
             // Add it to pending.
-            this.addToPending(bunchID, msg);
+            this.addToPending(bunchID, message);
             return;
           }
         }
 
         // At this point, BunchMeta dependencies are satisfied. Process the message.
-        this.list.set(decoded.pos, decoded.value);
+        this.list.set(message.pos, message.value);
         // Add to seen even before it's deleted, to reduce sparse-array fragmentation.
-        this.seen.add(decoded.pos);
+        this.seen.add(message.pos);
         // For a hypothetical event, compute the index.
-        void this.list.indexOfPosition(decoded.pos);
+        void this.list.indexOfPosition(message.pos);
 
-        if (decoded.meta) {
+        if (message.meta) {
           // The meta may have unblocked pending messages.
-          const unblocked = this.pending.get(decoded.meta.parentID);
+          const unblocked = this.pending.get(message.meta.parentID);
           if (unblocked !== undefined) {
             // TODO: if you unblock a long dependency chain (unlikely),
             // this recursion could overflow the stack.
@@ -142,40 +142,38 @@ export class ListCRDT<T> {
     }
   }
 
-  private addToPending(bunchID: string, msg: string): void {
+  private addToPending(bunchID: string, message: ListCrdtMessage<T>): void {
     let bunchPending = this.pending.get(bunchID);
     if (bunchPending === undefined) {
       bunchPending = new Set();
       this.pending.set(bunchID, bunchPending);
     }
-    bunchPending.add(msg);
+    bunchPending.add(message);
   }
 
-  save(): string {
-    const savedStateObj: SavedState<T> = {
+  save(): ListCrdtSavedState<T> {
+   return {
       order: this.list.order.save(),
       list: this.list.save(),
       seen: this.seen.save(),
     };
-    return JSON.stringify(savedStateObj);
   }
 
-  load(savedState: string): void {
-    const savedStateObj = JSON.parse(savedState) as SavedState<T>;
+  load(savedState: ListCrdtSavedState<T>): void {
     if (this.seen.state.size === 0) {
       // Never been used, so okay to load directly instead of doing a state-based
       // merge.
-      this.list.order.load(savedStateObj.order);
-      this.list.load(savedStateObj.list);
-      this.seen.load(savedStateObj.seen);
+      this.list.order.load(savedState.order);
+      this.list.load(savedState.list);
+      this.seen.load(savedState.seen);
     } else {
       // TODO: benchmark merging.
       // TODO: events.
       const otherList = new List<T>();
       const otherSeen = new Outline(otherList.order);
-      otherList.order.load(savedStateObj.order);
-      otherList.load(savedStateObj.list);
-      otherSeen.load(savedStateObj.seen);
+      otherList.order.load(savedState.order);
+      otherList.load(savedState.list);
+      otherSeen.load(savedState.seen);
 
       // Loop over all positions that had been inserted or deleted into
       // the other list.

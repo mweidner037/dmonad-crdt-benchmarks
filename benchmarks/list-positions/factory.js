@@ -1,18 +1,19 @@
 
-import { AbstractCrdt, CrdtFactory } from '../../js-lib/index.js' // eslint-disable-line
-import * as Y from 'yjs'
+import { AbstractCrdt, CrdtFactory } from '../../js-lib/index.js'; // eslint-disable-line
+import * as error from 'lib0/error';
+import { ListCRDT, TextCRDT } from './bundle.js';
 
-export const name = 'yjs'
+export const name = 'list-positions'
 
 /**
  * @implements {CrdtFactory}
  */
-export class YjsFactory {
+export class ListPositionsFactory {
   /**
    * @param {function(Uint8Array):void} updateHandler
    */
   create (updateHandler) {
-    return new YjsCRDT(updateHandler)
+    return new ListPositionsCRDT(updateHandler)
   }
 
   /**
@@ -21,8 +22,8 @@ export class YjsFactory {
    * @return {AbstractCrdt}
    */
   load (updateHandler, bin) {
-    const crdt = new YjsCRDT(updateHandler)
-    crdt.applyUpdate(bin)
+    const crdt = new ListPositionsCRDT(updateHandler)
+    crdt.load(bin)
     return crdt
   }
 
@@ -34,18 +35,21 @@ export class YjsFactory {
 /**
  * @implements {AbstractCrdt}
  */
-export class YjsCRDT {
+export class ListPositionsCRDT {
   /**
    * @param {function(Uint8Array):void} updateHandler
    */
   constructor (updateHandler) {
-    this.ydoc = new Y.Doc()
-    this.ydoc.on('updateV2', update => {
-      updateHandler(update)
+    this.textCrdt = new TextCRDT(msg => {
+      // Prepend with path to the CRDT.
+      msg = "text " + msg;
+      updateHandler(Buffer.from(msg))
     })
-    this.yarray = this.ydoc.getArray('array')
-    this.ymap = this.ydoc.getMap('map')
-    this.ytext = this.ydoc.getText('text')
+    this.arrayCrdt = new ListCRDT(msg => {
+      // Prepend with path to the CRDT.
+      msg = "array " + msg;
+      updateHandler(Buffer.from(msg))
+    })
   }
 
   /**
@@ -60,6 +64,13 @@ export class YjsCRDT {
    */
   applyUpdate (update) {
     Y.applyUpdateV2(this.ydoc, update)
+  }
+
+  /**
+   * @param {Uint8Array} savedState
+   */
+  load(savedState) {
+    // TODO
   }
 
   /**
@@ -120,7 +131,7 @@ export class YjsCRDT {
    * @param {function (AbstractCrdt): void} f
    */
   transact (f) {
-    this.ydoc.transact(() => f(this))
+    f(this);
   }
 
   /**
@@ -128,13 +139,13 @@ export class YjsCRDT {
    * @param {any} val
    */
   setMap (key, val) {
-    this.ymap.set(key, val)
+    error.methodUnimplemented()
   }
 
   /**
    * @return {Map<string,any> | Object<string, any>}
    */
   getMap () {
-    return this.ymap.toJSON()
+    error.methodUnimplemented()
   }
 }

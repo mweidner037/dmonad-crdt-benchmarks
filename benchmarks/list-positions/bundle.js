@@ -1,2 +1,2 @@
-// TODO: export CRDTs themselves
-export { Doc, applyUpdateV2, encodeStateAsUpdateV2 } from 'yjs'
+export { ListCRDT } from './generated/list_crdt';
+export { TextCRDT } from './generated/text_crdt';

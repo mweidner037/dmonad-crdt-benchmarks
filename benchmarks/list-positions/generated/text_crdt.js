@@ -1,6 +1,7 @@
 import { Outline, PositionSet, Text, } from "list-positions";
 /**
  * A traditional op-based/state-based text CRDT implemented on top of list-positions.
+ * Based on from https://github.com/mweidner037/list-positions/blob/master/benchmarks/internal/text_crdt.ts
  *
  * send/receive work on general networks (they build in exactly-once partial-order delivery),
  * and save/load work as state-based merging.
@@ -36,70 +37,69 @@ export class TextCRDT {
     }
     insertAt(index, char) {
         const [pos, newMeta] = this.text.insertAt(index, char);
-        const messageObj = { type: "set", pos, char };
+        const message = { type: "set", pos, char };
         if (newMeta !== null)
-            messageObj.meta = newMeta;
-        this.send(JSON.stringify(messageObj));
+            message.meta = newMeta;
+        this.send(message);
     }
     deleteAt(index) {
         const pos = this.text.positionAt(index);
         this.text.delete(pos);
-        const messageObj = { type: "delete", pos };
-        this.send(JSON.stringify(messageObj));
+        const message = { type: "delete", pos };
+        this.send(message);
     }
-    receive(msg) {
+    receive(message) {
         // TODO: test dedupe & partial ordering.
-        const decoded = JSON.parse(msg);
-        const bunchID = decoded.pos.bunchID;
-        switch (decoded.type) {
+        const bunchID = message.pos.bunchID;
+        switch (message.type) {
             case "delete":
                 // Mark the position as seen immediately, even if we don't have metadata
                 // for its bunch yet. Okay because this.seen is a PositionSet instead of an Outline.
-                this.seen.add(decoded.pos);
+                this.seen.add(message.pos);
                 // Delete the position if present.
                 // If the bunch is unknown, it's definitely not present, and we
                 // should skip calling list.has to avoid a "Missing metadata" error.
                 if (this.text.order.getNode(bunchID) !== undefined &&
-                    this.text.has(decoded.pos)) {
+                    this.text.has(message.pos)) {
                     // For a hypothetical event, compute the index.
-                    void this.text.indexOfPosition(decoded.pos);
-                    this.text.delete(decoded.pos);
+                    void this.text.indexOfPosition(message.pos);
+                    this.text.delete(message.pos);
                 }
                 break;
             case "set":
                 // This check is okay even if we don't have metadata for pos's bunch yet,
                 // because this.seen is a PositionSet instead of an Outline.
-                if (this.seen.has(decoded.pos)) {
+                if (this.seen.has(message.pos)) {
                     // The position has already been seen (inserted, inserted & deleted, or
                     // deleted by an out-of-order message). So don't need to insert it again.
                     return;
                 }
-                if (decoded.meta) {
-                    const parentID = decoded.meta.parentID;
+                if (message.meta) {
+                    const parentID = message.meta.parentID;
                     if (this.text.order.getNode(parentID) === undefined) {
                         // The meta can't be processed yet because its parent bunch is unknown.
                         // Add it to pending.
-                        this.addToPending(parentID, msg);
+                        this.addToPending(parentID, message);
                         return;
                     }
                     else
-                        this.text.order.addMetas([decoded.meta]);
+                        this.text.order.addMetas([message.meta]);
                     if (this.text.order.getNode(bunchID) === undefined) {
                         // The message can't be processed yet because its bunch is unknown.
                         // Add it to pending.
-                        this.addToPending(bunchID, msg);
+                        this.addToPending(bunchID, message);
                         return;
                     }
                 }
                 // At this point, BunchMeta dependencies are satisfied. Process the message.
-                this.text.set(decoded.pos, decoded.char);
+                this.text.set(message.pos, message.char);
                 // Add to seen even before it's deleted, to reduce sparse-array fragmentation.
-                this.seen.add(decoded.pos);
+                this.seen.add(message.pos);
                 // For a hypothetical event, compute the index.
-                void this.text.indexOfPosition(decoded.pos);
-                if (decoded.meta) {
+                void this.text.indexOfPosition(message.pos);
+                if (message.meta) {
                     // The meta may have unblocked pending messages.
-                    const unblocked = this.pending.get(decoded.meta.parentID);
+                    const unblocked = this.pending.get(message.meta.parentID);
                     if (unblocked !== undefined) {
                         // TODO: if you unblock a long dependency chain (unlikely),
                         // this recursion could overflow the stack.
@@ -110,39 +110,37 @@ export class TextCRDT {
                 break;
         }
     }
-    addToPending(bunchID, msg) {
+    addToPending(bunchID, message) {
         let bunchPending = this.pending.get(bunchID);
         if (bunchPending === undefined) {
             bunchPending = new Set();
             this.pending.set(bunchID, bunchPending);
         }
-        bunchPending.add(msg);
+        bunchPending.add(message);
     }
     save() {
-        const savedStateObj = {
+        return {
             order: this.text.order.save(),
             text: this.text.save(),
             seen: this.seen.save(),
         };
-        return JSON.stringify(savedStateObj);
     }
     load(savedState) {
-        const savedStateObj = JSON.parse(savedState);
         if (this.seen.state.size === 0) {
             // Never been used, so okay to load directly instead of doing a state-based
             // merge.
-            this.text.order.load(savedStateObj.order);
-            this.text.load(savedStateObj.text);
-            this.seen.load(savedStateObj.seen);
+            this.text.order.load(savedState.order);
+            this.text.load(savedState.text);
+            this.seen.load(savedState.seen);
         }
         else {
             // TODO: benchmark merging.
             // TODO: events.
             const otherText = new Text();
             const otherSeen = new Outline(otherText.order);
-            otherText.order.load(savedStateObj.order);
-            otherText.load(savedStateObj.text);
-            otherSeen.load(savedStateObj.seen);
+            otherText.order.load(savedState.order);
+            otherText.load(savedState.text);
+            otherSeen.load(savedState.seen);
             // Loop over all positions that had been inserted or deleted into
             // the other list.
             // We don't have to manage metadata because a saved state always includes
