@@ -102,7 +102,10 @@ export class ListPositionsCRDT {
    * @param {Array<any>} elems
    */
   insertArray (index, elems) {
-    this.arrayCrdt.insertAt(index, elems)
+    // list-positions supports bulk updates, they just aren't on the CRDTs.
+    for (let i = 0; i < elems.length; i++) {
+      this.arrayCrdt.insertAt(index + i, elems[i])
+    }
   }
 
   /**
@@ -112,7 +115,10 @@ export class ListPositionsCRDT {
    * @param {number} len
    */
   deleteArray (index, len) {
-    this.arrayCrdt.deleteAt(index, len)
+    // list-positions supports bulk updates, they just aren't on the CRDTs.
+    for (let i = len - 1; i >= 0; i--) {
+      this.arrayCrdt.deleteAt(index + i)
+    }
   }
 
   /**
@@ -129,7 +135,10 @@ export class ListPositionsCRDT {
    * @param {string} text
    */
   insertText (index, text) {
-    this.textCrdt.insertAt(index, text)
+    // list-positions supports bulk updates, they just aren't on the CRDTs.
+    for (let i = 0; i < text.length; i++) {
+      this.textCrdt.insertAt(index + i, text[i])
+    }
   }
 
   /**
@@ -139,7 +148,10 @@ export class ListPositionsCRDT {
    * @param {number} len
    */
   deleteText (index, len) {
-    this.textCrdt.deleteAt(index, len)
+    // list-positions supports bulk updates, they just aren't on the CRDTs.
+    for (let i = len - 1; i >= 0; i--) {
+      this.textCrdt.deleteAt(index + i)
+    }
   }
 
   /**
