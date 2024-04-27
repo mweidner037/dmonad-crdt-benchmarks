@@ -17,11 +17,11 @@
   "author": "Kevin Jahns",
   "license": "MIT",
   "dependencies": {
-    "@types/pako": "^2.0.3",
     "list-positions": "^1.0.0",
     "pako": "^2.1.0"
   },
   "devDependencies": {
+    "@types/pako": "^2.0.3",
     "typescript": "^5.4.5"
   }
 }
