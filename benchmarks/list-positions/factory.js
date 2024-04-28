@@ -1,7 +1,7 @@
 
 import { AbstractCrdt, CrdtFactory } from '../../js-lib/index.js'; // eslint-disable-line
 import * as error from 'lib0/error';
-import { ListCrdt, TextCrdt, gzip, ungzip } from './bundle.js';
+import { ListCrdt, TextCrdt, gzipSync, gunzipSync } from './bundle.js';
 
 export const name = 'list-positions'
 
@@ -67,14 +67,14 @@ export class ListPositionsCRDT {
     }
     // Use gzip'd JSON encoding. This trades off load/save time for size.
     // A custom binary encoding would probably give a better tradeoff.
-    return gzip(JSON.stringify(savedState));
+    return gzipSync(new TextEncoder().encode(JSON.stringify(savedState)));
   }
 
   /**
    * @param {Uint8Array} savedState
    */
   load(savedState) {
-    const savedStateObj = JSON.parse(ungzip(savedState, { to: "string" }));
+    const savedStateObj = JSON.parse(new TextDecoder().decode(gunzipSync(savedState)));
     this.textCrdt.load(savedStateObj.text);
     this.arrayCrdt.load(savedStateObj.array);
   }
