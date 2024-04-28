@@ -11,12 +11,11 @@
     "start:bun": "npm run measure-bundle && bun run run.js && npm run table",
     "start:browser": "rollup -c && 0serve -o benchmark.html",
     "table": "echo 'List-positions results: \n\n' && node ../../bin/render-table.js ../results.json 6000 list-positions",
-    "generate": "tsc",
-    "dist": "npm run clean && npm run generate && rollup -c && gzip --keep dist/*"
+    "dist": "npm run clean && rollup -c && gzip --keep dist/*"
   },
   "license": "MIT",
   "dependencies": {
-    "list-positions": "^1.0.0",
+    "@list-positions/crdts": "^0.1.0",
     "pako": "^2.1.0"
   },
   "devDependencies": {
