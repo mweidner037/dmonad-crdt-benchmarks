@@ -15,8 +15,8 @@
   },
   "license": "MIT",
   "dependencies": {
-    "list-positions": "^1.0.2",
-    "@list-positions/crdts": "^0.2.1",
+    "list-positions": "^2.0.0",
+    "@list-positions/crdts": "^0.3.0",
     "fflate": "^0.8.2"
   },
   "devDependencies": {
